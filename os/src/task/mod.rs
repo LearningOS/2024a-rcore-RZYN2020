@@ -17,8 +17,10 @@ mod task;
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use lazy_static::*;
 use switch::__switch;
+use task::TaskStat;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
@@ -54,6 +56,7 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            task_stat: TaskStat::new(),
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -79,6 +82,7 @@ impl TaskManager {
     fn run_first_task(&self) -> ! {
         let mut inner = self.inner.exclusive_access();
         let task0 = &mut inner.tasks[0];
+        task0.task_stat.start_time = get_time_ms();
         task0.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
         drop(inner);
@@ -88,6 +92,34 @@ impl TaskManager {
             __switch(&mut _unused as *mut TaskContext, next_task_cx_ptr);
         }
         panic!("unreachable in run_first_task!");
+    }
+
+
+    /// ...
+    pub fn syscalled(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_stat.syscall_times[syscall_id] += 1;
+    }    
+
+
+    /// ...
+    pub fn get_current_task(&self) -> usize {
+        self.inner.exclusive_access().current_task
+    }
+
+    /// ...
+    pub fn get_task_status(&self, id: usize) -> TaskStatus {
+        let inner = self.inner.exclusive_access();
+        let task = inner.tasks[id];
+        task.task_status
+    }
+
+    /// ...
+    pub fn get_task_stat(&self, id: usize) -> TaskStat {
+        let inner = self.inner.exclusive_access();
+        let task = inner.tasks[id];
+        task.task_stat
     }
 
     /// Change the status of current `Running` task into `Ready`.
@@ -122,6 +154,9 @@ impl TaskManager {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
+            if inner.tasks[next].task_stat.start_time == 0 {
+                inner.tasks[next].task_stat.start_time = get_time_ms();
+            }
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
