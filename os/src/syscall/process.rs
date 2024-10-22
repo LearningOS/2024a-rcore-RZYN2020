@@ -1,17 +1,8 @@
 //! Process management syscalls
 use crate::{
-    config::MAX_SYSCALL_NUM,
-    task::{
-        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
-    },
+        config::MAX_SYSCALL_NUM, mm::translated_type, task::{ change_program_brk, current_user_token, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, TASK_MANAGER
+    }, timer::{get_time_ms, get_time_us}
 };
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct TimeVal {
-    pub sec: usize,
-    pub usec: usize,
-}
 
 /// Task information
 #[allow(dead_code)]
@@ -22,6 +13,14 @@ pub struct TaskInfo {
     syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
     time: usize,
+}
+
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct TimeVal {
+    pub sec: usize,
+    pub usec: usize,
 }
 
 /// task exits and submit an exit code
@@ -43,7 +42,17 @@ pub fn sys_yield() -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    -1
+    let ts = unsafe {
+      translated_type(current_user_token(), _ts)
+    };
+    let us = get_time_us();
+    unsafe {
+        *ts = TimeVal {
+            sec: us / 1_000_000,
+            usec: us % 1_000_000,
+        };
+    }
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
@@ -51,7 +60,18 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
-    -1
+    let cur = TASK_MANAGER.get_current_stat();
+    let ti = unsafe {
+      translated_type(current_user_token(), _ti)
+    };
+    unsafe {
+        *ti = TaskInfo {
+            status: TASK_MANAGER.get_current_status(),
+            syscall_times: (*cur).syscall_times,
+            time: get_time_ms() - (*cur).start_time,
+        };
+    }
+    0
 }
 
 // YOUR JOB: Implement mmap.

@@ -1,10 +1,34 @@
 //! Types related to task management
 use super::TaskContext;
-use crate::config::TRAP_CONTEXT_BASE;
+use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::mm::{
     kernel_stack_position, MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE,
 };
 use crate::trap::{trap_handler, TrapContext};
+
+/// Task information
+#[derive(Debug, Clone, Copy)]
+pub struct TaskStat {
+    /// The numbers of syscall called by task
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    /// Total running time of task
+    pub start_time: usize,
+}
+
+impl TaskStat {
+    /// ...
+    pub fn new() -> Self {
+        Self {
+            syscall_times: [0; MAX_SYSCALL_NUM],
+            start_time: 0,
+        }
+    }
+
+    /// ...
+    pub fn add_syscall_time(&mut self, syscall_id: usize) {
+        self.syscall_times[syscall_id] += 1;
+    }
+}
 
 /// The task control block (TCB) of a task.
 pub struct TaskControlBlock {
@@ -28,7 +52,11 @@ pub struct TaskControlBlock {
 
     /// Program break
     pub program_brk: usize,
+
+    /// Task Info
+    pub task_stat: TaskStat,
 }
+
 
 impl TaskControlBlock {
     /// get the trap context
@@ -63,6 +91,7 @@ impl TaskControlBlock {
             base_size: user_sp,
             heap_bottom: user_sp,
             program_brk: user_sp,
+            task_stat: TaskStat::new(),
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.get_trap_cx();

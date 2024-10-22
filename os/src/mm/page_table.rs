@@ -171,3 +171,14 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     }
     v
 }
+
+/// ...
+pub unsafe fn translated_type<T>(token: usize, ptr: *mut T) -> *mut T {
+    // let size = core::mem::size_of::<T>();
+    let page_table = PageTable::from_token(token);
+    let addr = ptr as usize;
+    let va = VirtAddr::from(addr);
+    let vpn = va.floor();
+    let ppn = page_table.translate(vpn).unwrap().ppn();
+    ppn.get_bytes_array()[va.page_offset()..].as_mut_ptr() as *mut T
+}
