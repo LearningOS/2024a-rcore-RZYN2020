@@ -51,6 +51,43 @@ impl MemorySet {
     pub fn token(&self) -> usize {
         self.page_table.token()
     }
+
+
+    ///...
+    pub fn check_conflict(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let s0 = start_va.floor();
+        let e0 = end_va.ceil();
+        for area in self.areas.iter() {
+            let s = area.vpn_range.get_start();
+            let e  = area.vpn_range.get_end();
+            if !(s0 >= e || e0 <= s) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// ...
+    pub fn remove_area(&mut self,start_va: VirtAddr, end_va: VirtAddr) -> isize{ 
+        let s0 = start_va.floor();
+        let e0 = end_va.ceil();
+        let mut area_idx = None;
+        for (idx, area) in self.areas.iter().enumerate() {
+            let s = area.vpn_range.get_start();
+            let e  = area.vpn_range.get_end();
+            if s == s0 && e == e0 {
+                area_idx = Some(idx);
+            }
+        }
+        if let Some(idx) = area_idx {
+            let mut area = self.areas.remove(idx);
+            area.unmap(&mut self.page_table);
+            0
+        } else {
+            -1
+        }
+    }
+
     /// Assume that no conflicts.
     pub fn insert_framed_area(
         &mut self,

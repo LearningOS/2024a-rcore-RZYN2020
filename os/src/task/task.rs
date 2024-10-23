@@ -57,7 +57,6 @@ pub struct TaskControlBlock {
     pub task_stat: TaskStat,
 }
 
-
 impl TaskControlBlock {
     /// get the trap context
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
@@ -124,6 +123,42 @@ impl TaskControlBlock {
         } else {
             None
         }
+    }
+    /// mmap
+    pub fn sys_mmap(&mut self, _start: usize, _len: usize, _port: usize) -> isize {
+        let start_va = VirtAddr::from(_start);
+        let end_va = VirtAddr::from(_start + _len);
+        if start_va.page_offset()!= 0 || _port & !0x7 != 0 || _port & 0x7== 0 { 
+            return -1;
+        }
+        // [start, start + len) 中存在已经被映射的页
+        if self.memory_set.check_conflict(start_va, end_va) {
+            return -1;
+        }
+        let mut permission = MapPermission::U;
+        if _port & 0x1!= 0 {
+            permission |= MapPermission::R;
+        }
+        if _port & 0x2!= 0 {
+            permission |= MapPermission::W;
+        }
+        if _port & 0x4!= 0 {
+            permission |= MapPermission::X;
+        }
+        self.memory_set
+            .insert_framed_area(start_va, end_va, permission);
+        0
+    }
+
+    /// unmap
+    pub fn sys_unmap(&mut self, _start: usize, _len: usize) -> isize {
+        let start_va = VirtAddr::from(_start);
+        let end_va = VirtAddr::from(_start + _len);
+        if start_va.page_offset()!= 0 { 
+            return -1;
+        }
+        self.memory_set
+         .remove_area(start_va, end_va) 
     }
 }
 

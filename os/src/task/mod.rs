@@ -172,6 +172,23 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+
+    /// ...
+    fn sys_mmap(&self, _start: usize, _len: usize, _port: usize) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].sys_mmap(_start, _len, _port)
+    }
+
+
+    /// ...
+    fn sys_unmap(&self, _start: usize, _len: usize) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].sys_unmap(_start, _len)
+    }
+
 }
 
 /// Run the first task in task list.
@@ -220,4 +237,15 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+
+///...
+pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
+    TASK_MANAGER.sys_mmap(_start, _len, _port)
+}
+
+///...
+pub fn sys_unmap(_start: usize, _len: usize) -> isize {
+    TASK_MANAGER.sys_unmap(_start, _len)
 }
