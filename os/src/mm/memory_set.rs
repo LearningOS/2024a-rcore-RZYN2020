@@ -72,6 +72,37 @@ impl MemorySet {
             self.areas.remove(idx);
         }
     }
+
+    ///...
+    pub fn check_conflict(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let s = start_va.floor();
+        let e = end_va.ceil();
+        self.areas
+            .iter()
+            .find(|area| !(s >= area.vpn_range.get_end() || e <= area.vpn_range.get_start()))
+            .is_some()
+    }
+
+    /// ...
+    pub fn remove_area(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let s = start_va.floor();
+        let e = end_va.ceil();
+
+        if let Some((idx, area)) = self
+            .areas
+            .iter_mut()
+            .enumerate()
+            .find(|(_, area)| area.vpn_range.get_start() == s && area.vpn_range.get_end() == e)
+        {
+            area.unmap(&mut self.page_table);
+            self.areas.remove(idx);
+            true
+        } else {
+            false
+        }
+    }
+
+
     /// Add a new MapArea into this MemorySet.
     /// Assuming that there are no conflicts in the virtual address
     /// space.

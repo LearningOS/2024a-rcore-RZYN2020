@@ -2,7 +2,7 @@
 use super::TaskContext;
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
 use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
-use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
+use crate::mm::{MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::timer::get_time_ms;
 use crate::trap::{trap_handler, TrapContext};
@@ -34,7 +34,7 @@ impl TaskControlBlock {
     pub fn get_user_token(&self) -> usize {
         let inner = self.inner_exclusive_access();
         inner.memory_set.token()
-    }    
+    }
 }
 
 pub struct TaskControlBlockInner {
@@ -248,6 +248,49 @@ impl TaskControlBlock {
         } else {
             None
         }
+    }
+
+    /// mmap
+    pub fn mmap(&self, _start: usize, _len: usize, _port: usize) -> bool {
+        let start_va = VirtAddr::from(_start);
+        let end_va = VirtAddr::from(_start + _len);
+        if start_va.page_offset() != 0 || _port & !0x7 != 0 || _port & 0x7 == 0 {
+            return false;
+        }
+        // [start, start + len) 中存在已经被映射的页
+        if self
+            .inner_exclusive_access()
+            .memory_set
+            .check_conflict(start_va, end_va)
+        {
+            return false;
+        }
+        let mut permission = MapPermission::U;
+        if _port & 0x1 != 0 {
+            permission |= MapPermission::R;
+        }
+        if _port & 0x2 != 0 {
+            permission |= MapPermission::W;
+        }
+        if _port & 0x4 != 0 {
+            permission |= MapPermission::X;
+        }
+        self.inner_exclusive_access()
+            .memory_set
+            .insert_framed_area(start_va, end_va, permission);
+        true
+    }
+
+    /// unmap
+    pub fn unmap(&self, _start: usize, _len: usize) -> bool {
+        let start_va = VirtAddr::from(_start);
+        let end_va = VirtAddr::from(_start + _len);
+        if start_va.page_offset() != 0 {
+            return false;
+        }
+        self.inner_exclusive_access()
+            .memory_set
+            .remove_area(start_va, end_va)
     }
 }
 

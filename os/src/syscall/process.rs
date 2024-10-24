@@ -123,10 +123,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_get_time",
-        current_task().unwrap().pid.0
-    );
+    trace!("kernel:pid[{}] sys_get_time", current_task().unwrap().pid.0);
     let ts = translated_refmut(current_user_token(), _ts);
     let us = get_time_us();
     *ts = TimeVal {
@@ -157,21 +154,23 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
 }
 
 /// YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
+    trace!("kernel:pid[{}] sys_mmap", current_task().unwrap().pid.0);
+    if current_task().unwrap().mmap(start, len, port) {
+        0
+    } else {
+        -1
+    }
 }
 
 /// YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    trace!("kernel:pid[{}] sys_munmap", current_task().unwrap().pid.0);
+    if current_task().unwrap().unmap(start, len) {
+        0
+    } else {
+        -1
+    }
 }
 
 /// change data segment size
