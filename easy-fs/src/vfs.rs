@@ -5,6 +5,7 @@ use super::{
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use log::debug;
 use spin::{Mutex, MutexGuard};
 /// Virtual filesystem layer over easy-fs
 pub struct Inode {
@@ -138,6 +139,102 @@ impl Inode {
         )))
         // release efs lock automatically by compiler
     }
+
+    /// ...
+    pub fn link(&self, old_name: &str, new_name: &str) -> bool {
+        if let Some(inode) = self.find(old_name) {
+            // debug!("(fs)link file {} to {}", old_name, new_name);
+            self.modify_disk_inode(|root_inode| {
+                // debug!("(fs)find file {} success", old_name);
+                let inode_id = inode.get_inode_id();
+                let mut fs = self.fs.lock();
+                // append file in the dirent
+                let file_count = (root_inode.size as usize) / DIRENT_SZ;
+                let new_size = (file_count + 1) * DIRENT_SZ;
+                // increase size
+                self.increase_size(new_size as u32, root_inode, &mut fs);
+                // write dirent
+                let dirent = DirEntry::new(new_name, inode_id);
+                // debug!("(fs)write dirent");
+                root_inode.write_at(
+                    file_count * DIRENT_SZ,
+                    dirent.as_bytes(),
+                    &self.block_device,
+                );
+                // debug!("(fs)write dirent success");
+                // todo: sync problem
+                // block_cache_sync_all();
+            });
+            // debug!("(fs)link success");
+            true
+        } else {
+            false
+        }
+    }
+
+    ///...
+    pub fn get_link_num(&self, inode: Arc<Inode>) -> u32 {
+        self.read_disk_inode(|root_inode| {
+            let mut count = 0;
+            let file_count = (root_inode.size as usize) / DIRENT_SZ;
+            for i in 0..file_count {
+                let mut dirent = DirEntry::empty();
+                assert_eq!(
+                    root_inode.read_at(i * DIRENT_SZ, dirent.as_bytes_mut(), &self.block_device,),
+                    DIRENT_SZ
+                );
+                if dirent.inode_id() == inode.get_inode_id() {
+                    count += 1;
+                }
+            }
+            count
+        })
+    }
+
+    /// ...
+    pub fn get_inode_id(&self) -> u32 {
+        let fs = self.fs.lock();
+        fs.get_inode_id(self.block_id as u32, self.block_offset)
+    }
+
+    /// unlink
+    pub fn unlink(&self, name: &str) -> bool {
+        if let Some(inode) = self.find(name) {
+            let lk_num = self.get_link_num(inode.clone());
+            // debug!("(fs-unlink)link num: {}", lk_num);
+            assert!(lk_num > 0);
+            if lk_num == 1 {
+                inode.clear();
+            }
+            self.modify_disk_inode(|root_inode| {
+                let file_count = (root_inode.size as usize) / DIRENT_SZ;
+                for i in 0..file_count {
+                    let mut dirent = DirEntry::empty();
+                    assert_eq!(
+                        root_inode.read_at(
+                            i * DIRENT_SZ,
+                            dirent.as_bytes_mut(),
+                            &self.block_device,
+                        ),
+                        DIRENT_SZ
+                    );
+                    if dirent.name() == name {
+                        root_inode.write_at(
+                            i * DIRENT_SZ,
+                            DirEntry::empty().as_bytes(),
+                            &self.block_device,
+                        );
+                        break;
+                    }
+                }
+            });
+
+            true
+        } else {
+            false
+        }
+    }
+
     /// List inodes under current inode
     pub fn ls(&self) -> Vec<String> {
         let _fs = self.fs.lock();

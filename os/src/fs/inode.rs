@@ -124,6 +124,27 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
     }
 }
 
+
+/// Link a file
+pub fn link_file(old_name: &str, new_name: &str) -> bool {
+    ROOT_INODE.link(old_name, new_name)
+    // debug!("link file {} to {}", old_name, new_name);
+    // debug!("inode1 id: {}", ROOT_INODE.find(new_name).unwrap().get_inode_id());
+    // debug!("inode2 id: {}", ROOT_INODE.find(old_name).unwrap().get_inode_id());
+    // debug!("link count: {}", get_link_count(ROOT_INODE.find(new_name).unwrap()));
+}
+
+/// unlink a file
+pub fn unlink_file(name: &str) -> bool {
+    ROOT_INODE.unlink(name)
+}
+
+/// get link count of a node
+pub fn get_link_count(node: Arc<Inode>) -> u32 {
+    ROOT_INODE.get_link_num(node)
+}
+
+
 impl File for OSInode {
     fn readable(&self) -> bool {
         self.readable
@@ -154,5 +175,15 @@ impl File for OSInode {
             total_write_size += write_size;
         }
         total_write_size
+    }
+    fn stat(&self) -> super::Stat {
+        let inner = self.inner.exclusive_access();
+        super::Stat {
+            dev: 0,
+            ino: inner.inode.get_inode_id() as u64,
+            mode: super::StatMode::FILE,
+            nlink: get_link_count(inner.inode.clone()),
+            pad: [0; 7],
+        }
     }
 }
