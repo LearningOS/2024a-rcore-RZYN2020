@@ -187,7 +187,8 @@ pub fn sys_spawn(path: *const u8) -> isize {
     let token = current_user_token();
     let path = translated_str(token, path);
     if let Some(file) = open_file(path.as_str(), OpenFlags::RDONLY) {
-        let new_task = Arc::new(TaskControlBlock::new(&file.read_all()));
+        let all_data = file.read_all();
+        let new_task = Arc::new(TaskControlBlock::new(all_data.as_slice()));
         let pid = new_task.pid.0;
         current_task().unwrap().inner_exclusive_access().children.push(new_task.clone());
         new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&current_task().unwrap()));
