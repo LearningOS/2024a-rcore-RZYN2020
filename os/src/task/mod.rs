@@ -22,11 +22,11 @@ mod switch;
 #[allow(rustdoc::private_intra_doc_links)]
 mod task;
 
-use crate::fs::{open_file, OpenFlags};
+use crate::{config::BIG_STRIDE, fs::{open_file, OpenFlags}};
 use alloc::sync::Arc;
 pub use context::TaskContext;
 use lazy_static::*;
-pub use manager::{fetch_task, TaskManager, update_stride};
+pub use manager::{fetch_task, TaskManager};
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
@@ -46,6 +46,9 @@ pub fn suspend_current_and_run_next() {
     let task_cx_ptr = &mut task_inner.task_cx as *mut TaskContext;
     // Change status to Ready
     task_inner.task_status = TaskStatus::Ready;
+    // Add stride
+    task_inner.stride = task_inner.stride + BIG_STRIDE / task_inner.priority;
+    // ---- release current TCB
     drop(task_inner);
     // ---- release current PCB
 

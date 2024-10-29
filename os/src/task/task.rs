@@ -150,7 +150,7 @@ impl TaskControlBlock {
                     program_brk: user_sp,
                     start_time: get_time_ms(),
                     syscall_times: [0; MAX_SYSCALL_NUM],
-                    priority: 0,
+                    priority: 2,
                     stride: 0,
                 })
             },
@@ -235,7 +235,7 @@ impl TaskControlBlock {
                     program_brk: parent_inner.program_brk,
                     start_time: get_time_ms(),
                     syscall_times: [0; MAX_SYSCALL_NUM],
-                    priority: 0,
+                    priority: 2,
                     stride: 0,
                 })
             },

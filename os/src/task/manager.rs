@@ -1,7 +1,7 @@
 //!Implementation of [`TaskManager`]
 use super::TaskControlBlock;
-use crate::{config::BIG_STRIDE, sync::UPSafeCell};
-use alloc::{collections::binary_heap::BinaryHeap, sync::Arc, vec::Vec};
+use crate::sync::UPSafeCell;
+use alloc::{collections::binary_heap::BinaryHeap, sync::Arc};
 use lazy_static::*;
 
 struct ArcTask(Arc<TaskControlBlock>);
@@ -53,22 +53,6 @@ impl TaskManager {
     pub fn fetch(&mut self) -> Option<Arc<TaskControlBlock>> {
         self.ready_heap.pop().map(|t| t.0)
     }
-
-    /// ,,,
-    pub fn update_stride(&mut self, task: Arc<TaskControlBlock>) {
-        let mut modified_tasks = Vec::new();
-        while let Some(t) = self.ready_heap.pop() {
-            if Arc::as_ptr(&t.0) == Arc::as_ptr(&task) {
-                // 修改优先级
-                t.0.inner_exclusive_access().stride +=
-                    BIG_STRIDE / t.0.inner_exclusive_access().priority;
-            }
-            modified_tasks.push(t);
-        }
-        for task in modified_tasks {
-            self.ready_heap.push(task);
-        }
-    }
 }
 
 
@@ -76,11 +60,6 @@ lazy_static! {
     /// TASK_MANAGER instance through lazy_static!
     pub static ref TASK_MANAGER: UPSafeCell<TaskManager> =
         unsafe { UPSafeCell::new(TaskManager::new()) };
-}
-
-/// ...
-pub fn update_stride(task: Arc<TaskControlBlock>) {
-    TASK_MANAGER.exclusive_access().update_stride(task);
 }
 
 /// Add process to ready queue

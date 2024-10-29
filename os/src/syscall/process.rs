@@ -7,7 +7,7 @@ use crate::{
     fs::{open_file, OpenFlags},
     mm::{translated_refmut, translated_str},
     task::{
-        add_task, current_task, current_user_token, exit_current_and_run_next, suspend_current_and_run_next, update_stride, TaskControlBlock, TaskStatus
+        add_task, current_task, current_user_token, exit_current_and_run_next, suspend_current_and_run_next, TaskControlBlock, TaskStatus
     }, timer::{get_time_ms, get_time_us},
 };
 
@@ -209,6 +209,5 @@ pub fn sys_set_priority(_prio: isize) -> isize {
         return -1;
     }
     current_task().unwrap().inner_exclusive_access().priority = _prio as usize;
-    update_stride(current_task().unwrap());
     _prio
 }
