@@ -7,7 +7,7 @@ use crate::{
     fs::{open_file, OpenFlags},
     mm::{translated_refmut, translated_str},
     task::{
-        add_task, current_task, current_user_token, exit_current_and_run_next, suspend_current_and_run_next, TaskControlBlock, TaskStatus
+        add_task, current_task, current_user_token, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus
     }, timer::{get_time_ms, get_time_us},
 };
 
@@ -184,19 +184,32 @@ pub fn sys_spawn(path: *const u8) -> isize {
         "kernel:pid[{}] sys_spawn",
         current_task().unwrap().pid.0
     );
+    let current_task = current_task().unwrap();
+    let new_task = current_task.fork();
+    let new_pid = new_task.pid.0;
+    add_task(new_task.clone());
     let token = current_user_token();
     let path = translated_str(token, path);
-    if let Some(file) = open_file(path.as_str(), OpenFlags::RDONLY) {
-        let all_data = file.read_all();
-        let new_task = Arc::new(TaskControlBlock::new(all_data.as_slice()));
-        let pid = new_task.pid.0;
-        current_task().unwrap().inner_exclusive_access().children.push(new_task.clone());
-        new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&current_task().unwrap()));
-        add_task(new_task);
-        pid as isize
+    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let all_data = app_inode.read_all();
+        new_task.exec(all_data.as_slice());
+        new_pid as isize
     } else {
         -1
     }
+    // let token = current_user_token();
+    // let path = translated_str(token, path);
+    // if let Some(file) = open_file(path.as_str(), OpenFlags::RDONLY) {
+    //     let all_data = file.read_all();
+    //     let new_task = Arc::new(TaskControlBlock::new(&all_data));
+    //     let pid = new_task.pid.0;
+    //     current_task().unwrap().inner_exclusive_access().children.push(new_task.clone());
+    //     new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&current_task().unwrap()));
+    //     add_task(new_task);
+    //     pid as isize
+    // } else {
+    //     -1
+    // }
 }
 
 // YOUR JOB: Set task priority.
