@@ -16,6 +16,7 @@ mod process;
 mod processor;
 mod signal;
 mod switch;
+pub mod dead_lock;
 #[allow(clippy::module_inception)]
 mod task;
 
