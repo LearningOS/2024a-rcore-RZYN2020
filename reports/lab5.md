@@ -28,9 +28,16 @@ https://bigcat.ee/mutex-semaphore-condvar/
 线程A lock1   -> lock2(wait)
 线程B lock2                     -> lock1(dead)
 
+这需要死锁检测时只有死锁检测一个任务进行（避免并发bug）
+
 ## 简答作业
 
 1. 在我们的多线程实现中，当主线程 (即 0 号线程) 退出时，视为整个进程退出， 此时需要结束该进程管理的所有线程并回收其资源。 - 需要回收的资源有哪些？ - 其他线程的 TaskControlBlock 可能在哪些位置被引用，分别是否需要回收，为什么？
+
+资源有： tid, trap_cx, ustack, memroy_set...
+可能被🔒的队列或是调度队列引用；不需要，移除即可。
+
+
 
 2. 对比以下两种 Mutex.unlock 的实现，二者有什么区别？这些区别可能会导致什么问题？
 
@@ -58,6 +65,8 @@ https://bigcat.ee/mutex-semaphore-condvar/
 21    }
 22}
 ```
+
+前者没能正确实现🔒。在add_task时，locked=false且有一个线程进入了临界区。
 
 ## 荣誉准则
 
